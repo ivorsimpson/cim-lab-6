@@ -1,0 +1,48 @@
+# One complete experiment file: edit values here or override them on the command line.
+# Sweep several values at once with Hydra's multirun flag, e.g.
+#   uv run python -m cim_lab_6.main -m sampler.num_steps=50,200,1000
+experiment_name: sr4_dps
+seed: 0
+device: auto                 # auto (CUDA, then Apple MPS, then CPU), cpu, cuda, or mps
+
+mode: reconstruct            # reconstruct, or generate (unconditional samples from the prior)
+
+data:
+  root: data
+  image_size: 256            # must match the model: 256 for ffhq256/imagenet256, 64 for ffhq64
+  # Image names: a file stem inside data.root (faces/face_00), or dinv:<file> to fetch
+  # a DeepInverse example image (dinv:celeba_example.jpg, dinv:butterfly.png, ...).
+  names: [faces/face_00, dinv:celeba_example.jpg]
+
+model:
+  name: ffhq256              # ffhq256 (the DPS paper's prior), ffhq64 (fast, laptops), imagenet256 (2.1 GB)
+
+operator:
+  name: super_resolution     # super_resolution, gaussian_blur, motion_blur, inpainting_box,
+                             # inpainting_random, colourise
+  sr_factor: 4
+  blur_sigma: 3.0            # gaussian_blur, in pixels
+  motion_length: 0.5         # motion_blur trajectory length scale
+  box_fraction: 0.4          # inpainting_box: side length of the hidden square, as a fraction of the image
+  keep_fraction: 0.2         # inpainting_random: fraction of pixels observed
+  noise:
+    model: gaussian          # gaussian or poisson
+    sigma: 0.05              # gaussian: std on [0, 1] images
+    gain: 0.02               # poisson: y = gain * Poisson(x / gain)
+
+sampler:
+  name: ours                 # ours (readable loop in dps.py) or deepinv (dinv.sampling.DPS)
+  num_steps: 100             # diffusion steps (the DPS paper uses 1000), but that's a bit slow
+  eta: 1.0                   # 1 = stochastic DDPM-like steps, 0 = deterministic DDIM steps
+  guidance: dps              # dps, squared, annealed, none, or custom (your task)
+  weight: 1.0                # guidance strength (zeta in the DPS paper)
+  n_samples: 4               # posterior samples per image: their spread is DPS's uncertainty
+
+hydra:
+  run:
+    dir: outputs/${experiment_name}/${now:%Y-%m-%d_%H-%M-%S}
+  sweep:
+    dir: outputs/${experiment_name}/${now:%Y-%m-%d_%H-%M-%S}
+    subdir: ${hydra.job.override_dirname}
+  job:
+    chdir: true

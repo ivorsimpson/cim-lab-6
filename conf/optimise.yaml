@@ -1,0 +1,42 @@
+# Part G: hyperparameter search for the DPS sampler.
+#   uv run python -m cim_lab_6.optimise
+#   uv run python -m cim_lab_6.optimise operator.name=inpainting_box search.strategy=grid
+#
+# This file extends experiment.yaml: the task (operator, noise), model and image size come
+# from there, and you can override any of them on the command line as usual.
+defaults:
+  - experiment
+  - _self_
+
+experiment_name: optimise_${operator.name}
+
+# Images used to CHOOSE settings (validation) and to REPORT the final result (test).
+# They must not overlap. Why? What would go wrong if they did?
+validation: [faces/face_00, faces/face_01, faces/face_02]
+test: [faces/face_04, faces/face_05, faces/face_06, faces/face_07]
+
+# TASK 1: the search space. Which sampler settings are worth searching, and over what range?
+# Each entry is either
+#   {values: [a, b, c]}                         a discrete set (also used as-is by grid search), or
+#   {low: L, high: H, scale: linear|log, num: N} a continuous range; grid search uses N points.
+# Use a log scale when a parameter's sensible values span orders of magnitude.
+# Keys must be settings of `sampler` in experiment.yaml (weight, num_steps, eta, guidance).
+space:
+  weight: {values: [1.0]}   # one value is not a search: replace this with a range
+
+search:
+  strategy: random     # random or grid (TASK 2). How many runs would a grid over your space need?
+  trials: 16           # number of random configurations: your compute budget
+  n_samples: 1         # posterior samples per image while searching (more = less noisy, slower)
+
+# TASK 3: what does "best" mean for this task? See objective() in optimise.py.
+objective:
+  metric: lpips_sample         # any key of metrics.json, e.g. psnr_mean, lpips_sample, residual_over_noise
+  goal: minimise               # minimise or maximise
+  max_seconds_per_image: 30    # reject configurations slower than this
+
+# TASK 4: the best of many noisy trials is probably lucky. Re-check the top few.
+confirm:
+  top_k: 3                     # how many of the best trials to re-evaluate
+  seeds: [0, 1, 2]             # each re-evaluation uses these seeds
+  n_samples: 2
